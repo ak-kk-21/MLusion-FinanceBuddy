@@ -1,0 +1,9 @@
+<!-- templates/index.html -->
+{% extends "base.html" %}
+{% block content %}
+<h2>Classify Vendor</h2>
+<form action="/classify" method="post">
+    <input type="text" name="vendor" placeholder="Enter vendor name">
+    <button type="submit">Classify</button>
+</form>
+{% endblock %}
