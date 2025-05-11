@@ -2,77 +2,26 @@
 {% block content %}
 
 <div class="container py-5">
-    <div class="row">
-        <!-- Left Side: Input Form for SMS -->
-        <div class="col-md-6">
-            <div class="card p-4 border rounded-3 shadow-sm h-100">
-                <h4 class="text-primary">Enter Raw SMS Transaction</h4>
-                <form action="/sms_category" method="POST">
-                    <div class="form-group">
-                        <label for="sms_input">SMS Message</label>
-                        <textarea id="sms_input" name="sms_input" rows="5" class="form-control" placeholder="Enter the raw SMS here..."></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-success mt-3">Categorize Transaction</button>
-                </form>
-            </div>
-        </div>
+    <!-- Description -->
+    <div class="mb-4">
+        <h3 class="text-primary">SMS Transaction Categorization</h3>
+        <p class="text-muted">
+            This module processes raw financial SMS alerts to extract structured transaction data. 
+            It identifies the transaction timestamp, amount, vendor, and predicts the category using a machine learning model.
+        </p>
+    </div>
 
-        <!-- Right Side: Pie Chart Visualization -->
-        <div class="col-md-6">
-            <div class="card p-4 border rounded-3 shadow-sm h-100">
-                <h4 class="text-primary">Expenditure by Category</h4>
-                <div id="pie-chart-container">
-                    <canvas id="pieChart"></canvas>
-                </div>
+    <!-- SMS Input Form -->
+    <div class="card p-4 border rounded-3 shadow-sm">
+        <h5 class="mb-3">Enter Raw SMS Transaction</h5>
+        <form action="/sms_category" method="POST">
+            <div class="form-group">
+                <label for="sms_input">SMS Message</label>
+                <textarea id="sms_input" name="sms_input" rows="5" class="form-control" placeholder="e.g., ₹499 debited from HDFC on 2024-05-10 10:30 to ZOMATO ORDER" required></textarea>
             </div>
-        </div>
+            <button type="submit" class="btn btn-success mt-3">Categorize</button>
+        </form>
     </div>
 </div>
-
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-<script>
-function updatePieChart(data) {
-    const ctx = document.getElementById('pieChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: data.labels,
-            datasets: [{
-                data: data.values,
-                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4CAF50', '#9C27B0'],
-                borderColor: '#ffffff',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: {
-                legend: { position: 'top' },
-                tooltip: {
-                    callbacks: {
-                        label: function(context) {
-                            return context.label + ': ₹' + context.parsed;
-                        }
-                    }
-                }
-            }
-        }
-    });
-}
-
-{% if categories %}
-document.addEventListener('DOMContentLoaded', function () {
-    const categoriesData = {
-        labels: {{ categories | map(attribute='0') | list | tojson | safe }},
-        values: {{ categories | map(attribute='1') | list | tojson | safe }}
-    };
-    updatePieChart(categoriesData);
-});
-{% endif %}
-</script>
-
-
-
 
 {% endblock %}

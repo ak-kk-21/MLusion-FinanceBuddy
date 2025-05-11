@@ -1,9 +1,15 @@
 from flask import Flask, render_template, request, redirect, session, flash
 import sqlite3
 from werkzeug.security import generate_password_hash, check_password_hash
+import re
+from datetime import datetime
+from dotenv import load_dotenv
+import os
 
+load_dotenv()
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY")
 
 @app.route('/')
 def index():
@@ -46,38 +52,85 @@ def login():
 
     return render_template('login.html')
 
-# @app.route('/sms_category', methods=['GET', 'POST'])
-# def sms_category():
-#     user_id = session.get('user_id')
-#     if not user_id:
-#         flash("Please log in to view your SMS categories.", "warning")
-#         return redirect('/login')
+def categorize_transaction(vendor, amount, text):
+    """Stub: Replace this with actual ML or rule-based logic"""
+    if "zomato" in vendor.lower():
+        return "Food"
+    elif "amazon" in vendor.lower():
+        return "Shopping"
+    elif "petrol" in text.lower() or "fuel" in text.lower():
+        return "Transport"
+    else:
+        return "Uncategorized"
 
-#     if request.method == 'POST':
-#         sms_input = request.form['sms_input']
-#         # You’ll need to implement: parse_sms_and_insert_to_db(sms_input, user_id)
-#         # Then update category field using your ML model
+def parse_sms(sms_text):
+    """Extracts amount, timestamp, vendor, account (if available)"""
+    amount_match = re.search(r'₹?\s?(\d+(?:\.\d{1,2})?)', sms_text)
+    timestamp_match = re.search(r'on\s+(\d{4}-\d{2}-\d{2}[\sT]?\d{2}:\d{2})', sms_text)
+    vendor_match = re.search(r'to\s+([\w\s&.-]+)', sms_text, re.IGNORECASE)
+    account_match = re.search(r'from\s+(\w+)', sms_text, re.IGNORECASE)
 
-#     categories = get_category_data_for_user(user_id)
-#     return render_template('sms_category.html', categories=dict(categories))
+    amount = float(amount_match.group(1)) if amount_match else 0.0
+    timestamp = timestamp_match.group(1) if timestamp_match else datetime.now().strftime("%Y-%m-%d %H:%M")
+    vendor = vendor_match.group(1).strip() if vendor_match else "Unknown"
+    account_name = account_match.group(1).strip() if account_match else "Unknown"
+
+    return amount, timestamp, vendor, account_name
+
+@app.route('/sms_category', methods=['GET', 'POST'])
+def sms_category():
+    user_id = session.get('user_id')
+    if not user_id:
+        flash("Please log in to use this feature.", "warning")
+        return redirect('/login')
+
+    if request.method == 'POST':
+        sms_input = request.form['sms_input']
+        amount, timestamp, vendor, account_name = parse_sms(sms_input)
+        category = categorize_transaction(vendor, amount, sms_input)
+
+        # Find account_id from account_name if exists
+        conn = sqlite3.connect('financebuddy.db')
+        c = conn.cursor()
+
+        c.execute("SELECT account_id FROM Accounts WHERE user_id = ? AND bank_name = ?", (user_id, account_name))
+        acc = c.fetchone()
+        if acc:
+            account_id = acc[0]
+        else:
+            # Create new account entry
+            c.execute("INSERT INTO Accounts (user_id, bank_name) VALUES (?, ?)", (user_id, account_name))
+            account_id = c.lastrowid
+
+        # Insert transaction
+        c.execute('''INSERT INTO Expenses 
+                     (user_id, account_id, timestamp, amount, vendor, category, raw_text) 
+                     VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                  (user_id, account_id, timestamp, amount, vendor, category, sms_input))
+        conn.commit()
+        conn.close()
+
+        # Pass categorized data to the output page via session
+        session['categorized_sms'] = {
+            'timestamp': timestamp,
+            'vendor': vendor,
+            'amount': amount,
+            'category': category
+        }
+
+        return redirect('/categorized_output')
+
+    return render_template('sms_category.html')
 
 
-# def get_category_data_for_user(user_id):
-#     # Fetch category-wise data from the database for the user
-#     conn = sqlite3.connect('financebuddy.db')
-#     c = conn.cursor()
-#     c.execute('''
-#         SELECT category, SUM(amount) 
-#         FROM Expenses 
-#         WHERE user_id = ? 
-#         GROUP BY category
-#     ''', (user_id,))
-#     data = c.fetchall()
-#     conn.close()
-    
-#     # Return data in a dict format
-#     return {category: amount for category, amount in data}
+@app.route('/categorized_output')
+def categorized_output():
+    categorized_sms = session.get('categorized_sms')
+    if not categorized_sms:
+        flash("No transaction categorized yet.", "warning")
+        return redirect('/sms_category')
+
+    return render_template('categorized_output.html', categorized_sms=categorized_sms)
 
 if __name__ == '__main__':
     app.run(debug=True)
-

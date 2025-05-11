@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="card p-4 border rounded-3 shadow-sm">
+        <h5 class="mb-3">Categorized Transaction</h5>
+        <table class="table">
+            <tr>
+                <th>Timestamp</th>
+                <td>{{ categorized_sms.timestamp }}</td>
+            </tr>
+            <tr>
+                <th>Amount</th>
+                <td>₹{{ categorized_sms.amount }}</td>
+            </tr>
+            <tr>
+                <th>Vendor</th>
+                <td>{{ categorized_sms.vendor }}</td>
+            </tr>
+            <tr>
+                <th>Category</th>
+                <td>{{ categorized_sms.category }}</td>
+            </tr>
+        </table>
+        <a href="/sms_category" class="btn btn-primary mt-3">Categorize Another SMS</a>
+    </div>
+</div>
+{% endblock %}
